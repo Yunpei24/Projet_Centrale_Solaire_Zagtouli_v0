@@ -1,0 +1,12 @@
+numpy
+pandas
+matplotlib
+seaborn
+scikit-learn
+scipy
+jupyter
+statsmodels
+tqdm
+sqlalchemy
+psycopg2-binary
+mysql-connector-python

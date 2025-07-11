@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explorateur de Données pour Modèles de Prédiction</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Harmony -->
+    <!-- Application Structure Plan: A task-oriented SPA with two main views controlled by navigation buttons: 'Prédiction de Production' and 'Maintenance Prédictive'. This structure allows users to actively switch contexts and instantly see which data points are relevant to each task, making the information more digestible and engaging than a static report. Each view features highlighted data cards and a corresponding feature importance chart to provide both qualitative and quantitative insights. This design prioritizes user-driven exploration over passive reading. -->
+    <!-- Visualization & Content Choices: Report Info: Column descriptions and relevance. Goal: Inform & Compare. Viz/Presentation: Interactive highlighted cards (HTML/CSS/JS) to show relevance. Bar charts (Chart.js) to quantify feature importance (using mock data). Interaction: Clicking navigation buttons updates highlighting and charts. Justification: This combined approach makes the abstract concept of 'relevance' visual and interactive. Cards provide detailed descriptions, while charts offer a quick summary. Library/Method: Chart.js for canvas-based charts. NO SVG/Mermaid. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFBF8;
+            color: #383838;
+        }
+        .nav-button {
+            transition: all 0.3s ease;
+        }
+        .nav-button.active {
+            background-color: #007A5A;
+            color: #FFFFFF;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .nav-button:not(.active) {
+            background-color: #FFFFFF;
+            color: #383838;
+        }
+        .column-card {
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        .column-card.highlighted {
+            border-color: #007A5A;
+            background-color: #F0FDF4;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 400px; 
+            max-height: 50vh;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 450px;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="container mx-auto px-4 py-8 md:py-12">
+
+        <header class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-bold text-[#004D40] mb-2">Analyse des Données pour Modèles de Prédiction</h1>
+            <p class="text-lg text-gray-600">Explorez interactivement les variables clés pour la production d'énergie et la maintenance prédictive.</p>
+        </header>
+
+        <nav class="flex justify-center items-center space-x-2 md:space-x-4 mb-12 p-2 bg-gray-100 rounded-full max-w-lg mx-auto">
+            <button id="btn-prediction" class="nav-button w-full md:w-auto text-sm md:text-base font-semibold py-3 px-6 rounded-full">Prédiction de Production</button>
+            <button id="btn-maintenance" class="nav-button w-full md:w-auto text-sm md:text-base font-semibold py-3 px-6 rounded-full">Maintenance Prédictive</button>
+        </nav>
+
+        <main id="main-content">
+            
+            <section id="view-prediction">
+                <div class="text-center mb-12">
+                    <h2 class="text-2xl font-bold text-[#004D40] mb-2">Modèle de Prédiction de la Production d'Énergie</h2>
+                    <p class="max-w-3xl mx-auto text-gray-600">Cette section met en lumière les variables essentielles pour prédire la quantité d'énergie solaire qui sera produite. Les facteurs météorologiques et les paramètres de performance photovoltaïque sont prédominants. Interagissez avec les cartes pour voir les détails de chaque variable pertinente.</p>
+                </div>
+                 <div class="chart-container mb-12">
+                    <canvas id="predictionChart"></canvas>
+                </div>
+            </section>
+            
+            <section id="view-maintenance" class="hidden">
+                 <div class="text-center mb-12">
+                    <h2 class="text-2xl font-bold text-[#004D40] mb-2">Modèle de Maintenance Prédictive</h2>
+                    <p class="max-w-3xl mx-auto text-gray-600">Ici, nous nous concentrons sur les indicateurs de santé des équipements. L'objectif est d'anticiper les pannes en surveillant les températures, l'état de communication et les signes de vieillissement. Les variables surlignées sont cruciales pour détecter les anomalies avant qu'elles ne deviennent critiques.</p>
+                </div>
+                 <div class="chart-container mb-12">
+                    <canvas id="maintenanceChart"></canvas>
+                </div>
+            </section>
+            
+            <div id="columns-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            </div>
+
+        </main>
+        
+        <footer class="text-center mt-16 pt-8 border-t border-gray-200">
+            <p class="text-gray-500">Ce document interactif a été généré pour servir de base à la préparation des données et à l'entraînement des modèles. Il synthétise la pertinence de chaque variable pour les deux cas d'utilisation étudiés.</p>
+        </footer>
+    </div>
+
+    <script>
+        const columnsData = [
+            { id: 'FechaHora', name: "Date et Heure", category: 'Commun', description: "Date et heure de l'enregistrement, essentielle pour l'analyse des séries temporelles.", prediction: true, maintenance: false },
+            { id: 'Coil_Temperature', name: "Température de la bobine", category: 'Onduleur', description: "La température de la bobine de l'onduleur. Une surchauffe peut indiquer un problème.", prediction: false, maintenance: true },
+            { id: 'HeatSink_R_Temperature', name: "Température Dissipateur (R)", category: 'Onduleur', description: "Température du dissipateur thermique pour la phase R. Indicateur de surchauffe.", prediction: false, maintenance: true },
+            { id: 'HeatSink_S_Temperature', name: "Température Dissipateur (S)", category: 'Onduleur', description: "Température du dissipateur thermique pour la phase S. Indicateur de surchauffe.", prediction: false, maintenance: true },
+            { id: 'HeatSink_T_Temperature', name: "Température Dissipateur (T)", category: 'Onduleur', description: "Température du dissipateur thermique pour la phase T. Indicateur de surchauffe.", prediction: false, maintenance: true },
+            { id: 'Communication_Status', name: "Statut de Communication", category: 'Onduleur', description: "Indique si l'onduleur communique correctement. Une perte peut signaler une panne.", prediction: false, maintenance: true },
+            { id: 'Daily_AC_Energy_Injected', name: "Énergie AC Quotidienne", category: 'Onduleur', description: "Énergie AC injectée quotidiennement dans le réseau. Variable cible pour la prédiction.", prediction: true, maintenance: false },
+            { id: 'Total_AC_Energy_Injected', name: "Énergie AC Totale", category: 'Onduleur', description: "Énergie totale injectée depuis le début de l'opération.", prediction: false, maintenance: false },
+            { id: 'Grid_Frequency', name: "Fréquence du Réseau", category: 'Onduleur', description: "Fréquence du réseau électrique. Peut influencer la stabilité de la production.", prediction: true, maintenance: false },
+            { id: 'Grid_RMS_Voltage_Phase1', name: "Tension RMS Réseau (P1)", category: 'Onduleur', description: "Tension RMS de la phase 1 du réseau.", prediction: false, maintenance: false },
+            { id: 'Output_Active_Power', name: "Puissance Active de Sortie", category: 'Onduleur', description: "Puissance active produite. Indicateur direct de la puissance générée.", prediction: true, maintenance: false },
+            { id: 'Output_Reactive_Power', name: "Puissance Réactive de Sortie", category: 'Onduleur', description: "Puissance réactive produite, importante pour la stabilité du réseau.", prediction: false, maintenance: false },
+            { id: 'Output_Grid_RMS_Current_Phase1', name: "Courant RMS Réseau (P1)", category: 'Onduleur', description: "Courant RMS de la phase 1. Un déséquilibre peut indiquer une surcharge.", prediction: false, maintenance: true },
+            { id: 'PV_Current', name: "Courant PV", category: 'Onduleur', description: "Courant produit par les panneaux photovoltaïques.", prediction: true, maintenance: false },
+            { id: 'PV_Voltage', name: "Tension PV", category: 'Onduleur', description: "Tension produite par les panneaux photovoltaïques.", prediction: true, maintenance: false },
+            { id: 'Cosine_Phi', name: "Cosinus Phi", category: 'Onduleur', description: "Facteur de puissance, indique l'efficacité de la transmission.", prediction: false, maintenance: true },
+            { id: 'Total_Hours_Operation', name: "Heures Totales d'Opération", category: 'Onduleur', description: "Nombre total d'heures de fonctionnement. Indicateur de vieillissement.", prediction: false, maintenance: true },
+            { id: 'AirTemperature', name: "Température de l'air", category: 'Météo', description: "Température de l'air ambiant. Facteur clé influençant la performance des panneaux.", prediction: true, maintenance: false },
+            { id: 'Pyr1IrradianceCompensated', name: "Irradiance Solaire", category: 'Météo', description: "Mesure directe de la lumière solaire disponible pour la production d'énergie.", prediction: true, maintenance: false },
+            { id: 'RelativeHumidity', name: "Humidité Relative", category: 'Météo', description: "Humidité relative de l'air. Peut impacter la performance des panneaux.", prediction: true, maintenance: false },
+            { id: 'WindSpeed', name: "Vitesse du Vent", category: 'Météo', description: "Le vent a un effet de refroidissement sur les panneaux, améliorant leur efficacité.", prediction: true, maintenance: false },
+            { id: 'WindDirection', name: "Direction du Vent", category: 'Météo', description: "Direction du vent, pour des analyses environnementales détaillées.", prediction: true, maintenance: false },
+            { id: 'Pyr1FanRotationSpeed', name: "Vitesse Ventilateur Pyranomètre", category: 'Météo', description: "Indique le bon fonctionnement du capteur d'irradiance.", prediction: false, maintenance: true },
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const btnPrediction = document.getElementById('btn-prediction');
+            const btnMaintenance = document.getElementById('btn-maintenance');
+            const viewPrediction = document.getElementById('view-prediction');
+            const viewMaintenance = document.getElementById('view-maintenance');
+            const columnsGrid = document.getElementById('columns-grid');
+            
+            let currentView = 'prediction';
+            let predictionChartInstance, maintenanceChartInstance;
+
+            function renderColumns() {
+                columnsGrid.innerHTML = '';
+                columnsData.forEach(col => {
+                    const card = document.createElement('div');
+                    card.className = 'column-card bg-white p-5 rounded-lg shadow-md border-2 border-transparent';
+                    card.id = `col-${col.id}`;
+                    
+                    let categoryColor = 'bg-gray-200 text-gray-800';
+                    if (col.category === 'Onduleur') {
+                        categoryColor = 'bg-blue-100 text-blue-800';
+                    } else if (col.category === 'Météo') {
+                        categoryColor = 'bg-yellow-100 text-yellow-800';
+                    } else if (col.category === 'Commun') {
+                        categoryColor = 'bg-green-100 text-green-800';
+                    }
+
+                    card.innerHTML = `
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="text-lg font-semibold text-gray-800">${col.name}</h3>
+                            <span class="text-xs font-medium px-2 py-1 rounded-full ${categoryColor}">${col.category}</span>
+                        </div>
+                        <p class="text-sm text-gray-600">${col.description}</p>
+                    `;
+                    columnsGrid.appendChild(card);
+                });
+            }
+
+            function updateView() {
+                const isPrediction = currentView === 'prediction';
+                
+                btnPrediction.classList.toggle('active', isPrediction);
+                btnMaintenance.classList.toggle('active', !isPrediction);
+                
+                viewPrediction.classList.toggle('hidden', !isPrediction);
+                viewMaintenance.classList.toggle('hidden', isPrediction);
+
+                columnsData.forEach(col => {
+                    const card = document.getElementById(`col-${col.id}`);
+                    if(card){
+                        const isHighlighted = isPrediction ? col.prediction : col.maintenance;
+                        card.classList.toggle('highlighted', isHighlighted);
+                    }
+                });
+            }
+            
+            function createCharts() {
+                const chartOptions = {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: {
+                                color: '#E5E7EB'
+                            },
+                            ticks: {
+                                color: '#6B7280'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: '#1F2937',
+                                font: {
+                                    weight: '500'
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: '#1F2937',
+                            titleFont: { size: 16 },
+                            bodyFont: { size: 14 },
+                        }
+                    }
+                };
+                
+                const predictionData = {
+                    labels: ['Irradiance Solaire', 'Courant PV', 'Tension PV', 'Température de l\'air', 'Puissance Active', 'Vitesse du Vent'],
+                    datasets: [{
+                        label: 'Importance pour la Prédiction',
+                        data: [95, 88, 85, 75, 70, 60],
+                        backgroundColor: '#007A5A',
+                        borderRadius: 4
+                    }]
+                };
+
+                const maintenanceData = {
+                    labels: ['Heures d\'Opération', 'Température Bobine', 'Température Dissipateur', 'Statut Communication', 'Courant RMS (P1)', 'Cosinus Phi'],
+                    datasets: [{
+                        label: 'Importance pour la Maintenance',
+                        data: [92, 89, 85, 80, 78, 65],
+                        backgroundColor: '#D97706',
+                        borderRadius: 4
+                    }]
+                };
+
+                const ctxPrediction = document.getElementById('predictionChart').getContext('2d');
+                predictionChartInstance = new Chart(ctxPrediction, {
+                    type: 'bar',
+                    data: predictionData,
+                    options: { ...chartOptions, plugins: { ...chartOptions.plugins, title: { display: true, text: "Importance des variables pour la prédiction de production", font: {size: 16}, color: '#383838' } } }
+                });
+
+                const ctxMaintenance = document.getElementById('maintenanceChart').getContext('2d');
+                maintenanceChartInstance = new Chart(ctxMaintenance, {
+                    type: 'bar',
+                    data: maintenanceData,
+                    options: { ...chartOptions, plugins: { ...chartOptions.plugins, title: { display: true, text: "Importance des variables pour la maintenance prédictive", font: {size: 16}, color: '#383838' } } }
+                });
+            }
+
+            btnPrediction.addEventListener('click', () => {
+                currentView = 'prediction';
+                updateView();
+            });
+
+            btnMaintenance.addEventListener('click', () => {
+                currentView = 'maintenance';
+                updateView();
+            });
+            
+            renderColumns();
+            createCharts();
+            updateView();
+        });
+    </script>
+</body>
+</html>
